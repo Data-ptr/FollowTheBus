@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<!--
+Created using JS Bin
+http://jsbin.com
+
+Copyright (c) 2015 by Data*Ptr (http://jsbin.com/cixasiyowu/1/edit)
+
+Released under the MIT license: http://jsbin.mit-license.org
+-->
+<meta name="robots" content="noindex">
+<html>
+
+<head>
+    <script src="https://code.jquery.com/jquery-2.1.4.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/underscore.string/3.2.2/underscore.string.js"></script>
+
+    <meta charset="utf-8">
+    <title>JS Bin</title>
+</head>
+
+<body>
+    <img src="#" />
+
+    <script id="jsbin-javascript">
+        var busNumber = 1579;
+
+        $(document).ready(function() {
+            var busHistory = [];
+
+            getBusData(busNumber);
+
+            setInterval(
+                function() {
+                    getBusData(busNumber);
+                },
+                15000
+            );
+
+            function getBusData(busNumber) {
+                var busUrlFormat = 'http://webservices.nextbus.com/service/publicXMLFeed?command=vehicleLocations&a=%s&r=%s&t=%d';
+
+                var busAgency = 'ttc';
+                var routeTag = '';
+                var time = 0;
+
+                var busUrl = s.sprintf(
+                    busUrlFormat,
+                    busAgency,
+                    routeTag,
+                    time
+                );
+
+                var config = {
+                    url: busUrl,
+                    dataType: 'xml',
+                    crossDomain: true
+                };
+
+                $.ajax(config).then(
+                    function(data, textStatus, jqXHR) {
+                        var ourBus = data.querySelector(
+                            'vehicle[id="' +
+                            busNumber +
+                            '"]'
+                        );
+
+                        if (ourBus) {
+                            ourBus = ourBus.attributes;
+                        } else {
+                            console.log('Bus not found');
+                            return;
+                        }
+
+                        var location = {
+                            lat: parseFloat(ourBus.lat.value),
+                            long: parseFloat(ourBus.lon.value),
+                            route: ourBus.routeTag.value,
+                            dirtag: ourBus.dirTag.value
+                        };
+
+                        busHistory.push(location);
+
+                        if (busHistory.length > 8) {
+                            busHistory.shift();
+                        }
+
+                        console.log(
+                            'Found Location: ',
+                            location,
+                            busUrl);
+
+                        drawMap(
+                            location.lat,
+                            location.long
+                        );
+                    },
+                    function(jqXHR, textStatus, errorThrown) {
+                        console.log('No');
+                    }
+                );
+            }
+
+            function drawMap(lat, long) {
+                var mapsUrlFormatFull = 'https://maps.googleapis.com/maps/api/staticmap?center=%s&zoom=%d&size=%dx%d&markers=%s';
+
+                var mapsUrlFormatAuto = 'https://maps.googleapis.com/maps/api/staticmap?zoom=%d&size=%dx%d&markers=%s';
+
+                var center = 'Davisville,Toronto,Ontario';
+                var zoom = 15;
+                var sizex = 500;
+                var sizey = 400;
+                var mColor = 'blue';
+                var mLabel = 'B';
+
+                var mLocation = '';
+
+                var lastLocation;
+
+                var truncateTo = 4;
+
+                for (var bh in busHistory) {
+                    if (lastLocation) {
+                        var latTrunc = truncBy(busHistory[bh].lat, truncateTo);
+                        var lastLatTrunc = truncBy(lastLocation.lat, truncateTo);
+
+                        var longTrunc = truncBy(busHistory[bh].long, truncateTo);
+                        var lastLongTrunc = truncBy(lastLocation.long, truncateTo);
+
+                        if (lastLongTrunc == longTrunc &&
+                            lastLatTrunc == latTrunc
+                        ) {
+                            continue;
+                        }
+                    }
+
+                    lastLocation = busHistory[bh];
+
+                    mLocation += s.sprintf(
+                        '|%f,%f',
+                        busHistory[bh].lat,
+                        busHistory[bh].long);
+                }
+
+                var markerFormat = 'color:%s|label:%s%s';
+
+                var markers = encodeURI(
+                    s.sprintf(
+                        markerFormat,
+                        mColor,
+                        mLabel,
+                        mLocation
+                    )
+                );
+
+                var mapsUrlFull = s.sprintf(
+                    mapsUrlFormatFull,
+                    center,
+                    zoom,
+                    sizex,
+                    sizey,
+                    markers
+                );
+
+                var mapsUrlAuto = s.sprintf(
+                    mapsUrlFormatAuto,
+                    zoom,
+                    sizex,
+                    sizey,
+                    markers
+                );
+
+                console.log(mapsUrlAuto);
+
+                $('img').attr('src', mapsUrlAuto);
+            }
+
+
+            function truncBy(number, by) {
+                var toTrunc = number.toString();
+
+                toTrunc = toTrunc.substring(
+                    0,
+                    toTrunc.lastIndexOf('.') + by
+                );
+
+                return parseFloat(toTrunc);
+            }
+        });
+    </script>
+</body>
+
+</html>
